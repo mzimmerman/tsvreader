@@ -10,6 +10,8 @@ import (
 	"strconv"
 )
 
+var useComma = flag.Bool("useComma", false, "Specify to use comman instead of tab for delimiter")
+
 // takes file from stdin and outputs to stdout in the correct time format, one date per line
 func main() {
 	flag.Parse()
@@ -30,7 +32,10 @@ func main() {
 	csvReader := csv.NewReader(bufio.NewReader(os.Stdin))
 	csvWriter := csv.NewWriter(bufio.NewWriter(os.Stdout))
 	defer csvWriter.Flush()
-	csvReader.Comma = '\t'
+	if !*useComma {
+		csvReader.Comma = '\t'
+		csvWriter.Comma = '\t'
+	}
 	for {
 		data, err := csvReader.Read()
 		if err == io.EOF {
