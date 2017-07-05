@@ -8,15 +8,24 @@ import (
 	"log"
 	"os"
 	"strconv"
+
+	"github.com/mzimmerman/multicorecsv"
 )
 
-var useComma = flag.Bool("useComma", false, "Specify to use comman instead of tab for delimiter")
+var useCommaIn = flag.Bool("useCommaIn", false, "Specify to use comma instead of tab for delimiter on input")
+var useCommaOut = flag.Bool("useCommaOut", false, "Specify to use comma instead of tab for delimiter on output")
+var useMultiCore = flag.Bool("multicore", false, "Use multicore - lines will be unordered and input data cannot multiline fields")
 
 // takes file from stdin and outputs to stdout in the correct time format, one date per line
 func main() {
 	flag.Parse()
 	var columns []int
+	copyAll := false
 	for _, arg := range flag.Args() {
+		if arg == "all" {
+			copyAll = true
+			break
+		}
 		i, err := strconv.Atoi(arg)
 		if err != nil {
 			log.Fatalf("arg is not an integer - %s", arg)
@@ -26,16 +35,19 @@ func main() {
 		}
 		columns = append(columns, i)
 	}
-	if len(columns) == 0 {
+	if len(columns) == 0 && !copyAll {
 		log.Fatalf("Need to specify which columns to output")
 	}
-	csvReader := csv.NewReader(bufio.NewReader(os.Stdin))
+	csvReader := multicorecsv.NewReader(bufio.NewReader(os.Stdin))
+	if !*useCommaIn {
+		csvReader.Comma = '\t'
+	}
 	csvWriter := csv.NewWriter(bufio.NewWriter(os.Stdout))
 	defer csvWriter.Flush()
-	if !*useComma {
-		csvReader.Comma = '\t'
+	if !*useCommaOut {
 		csvWriter.Comma = '\t'
 	}
+	var newData []string
 	for {
 		data, err := csvReader.Read()
 		if err == io.EOF {
@@ -44,9 +56,16 @@ func main() {
 		if err != nil {
 			log.Fatalf("Error reading standard in - %v", err)
 		}
-		newData := make([]string, len(columns))
-		for x, y := range columns {
-			newData[x] = data[y]
+
+		if copyAll {
+			newData = data
+		} else {
+			if len(newData) != len(columns) {
+				newData = make([]string, len(columns))
+			}
+			for x, y := range columns {
+				newData[x] = data[y]
+			}
 		}
 		err = csvWriter.Write(newData)
 		if err != nil {
